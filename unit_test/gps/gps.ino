@@ -3,20 +3,20 @@
 #include <TinyGPS++.h>
 
 TinyGPSPlus gps;
-SoftwareSerial mySerial(A2, A3);  // arduinoの2とGPSのTXD, 3をRXDと接続
+//SoftwareSerial mySerial(A2, A3);  // arduinoの2とGPSのTXD, 3をRXDと接続
 
 void setup() {
   pinMode(A2, INPUT);
   Serial.begin(9600);
   delay(300);
-  mySerial.begin(9600);
-  delay(300);
-  mySerial.listen();
+  //mySerial.begin(9600);
+  //delay(300);
+  //mySerial.listen();
 }
 
 void loop() {
-  while (mySerial.available() > 0) {
-    char c = mySerial.read();
+  while (Serial.available() > 0) {
+    char c = Serial.read();
     gps.encode(c);
     if (gps.location.isUpdated()) {
       Serial.print("LAT=");
