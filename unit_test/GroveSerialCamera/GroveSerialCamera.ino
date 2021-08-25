@@ -7,7 +7,7 @@
 //  For more details about the product please check http://www.seeedstudio.com/depot/
 
 #include <SPI.h>
-#include <arduino.h>
+#include <Arduino.h>
 #include <SoftwareSerial.h>
 #include <SD.h>
 

@@ -1,6 +1,6 @@
 // https://deviceplus.jp/hobby/entry016/
-#define echoPin A0  // Echo Pin
-#define trigPin A1  // Trigger Pin
+#define echoPin A1  // Echo Pin
+#define trigPin A0  // Trigger Pin
 
 double duration;
 double distance;
