@@ -35,6 +35,7 @@ SoftwareSerial XBeeSerial(XBEE_RX_PIN, XBEE_TX_PIN);
 
 #include <SD.h>
 File logFile;
+String logFileName;
 
 #define SLOGFLN(X) {Serial.println(F((X)));XBeeSerial.println(F((X)));logFile.println(F((X)));logFile.flush();}
 #define SLOGF(X) {Serial.print(F((X)));XBeeSerial.print(F((X)));logFile.print(F((X)));logFile.flush();}
@@ -156,14 +157,31 @@ void setup() {
   else {
     Serial.println(F("error opening nine.txt"));
   }
-
-  if(SD.exists(F("log.txt"))){
-    SD.remove(F("log.txt"));
-    Serial.println(F("removed log.txt"));
+  updated = false;
+  while(!updated){
+    while (Serial.available() > 0) {
+      char c = Serial.read();
+      gps.encode(c);
+      if (gps.location.isUpdated()) {
+        month = gps.date.month();
+        day = gps.date.day();
+        hour = gps.time.hour();
+        minute = gps.time.minute();
+        logFileName = String(month*1000000+day*10000+hour*100+minute);
+        Serial.println(logFileName);
+        updated = true;
+        break;
+      }
+    }
   }
-  logFile = SD.open("log.txt", FILE_WRITE);
+
+  if(SD.exists(logFileName)){
+    SD.remove(logFileName);
+    Serial.println(F("removed logfile"));
+  }
+  logFile = SD.open(logFileName, FILE_WRITE);
   if (logFile) {
-    Serial.println(F("opened log.txt"));
+    Serial.println(F("opened logfile"));
     //logFile.close();
     //SLOGFLN("SD success");
   }
