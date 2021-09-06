@@ -37,10 +37,10 @@ SoftwareSerial XBeeSerial(XBEE_RX_PIN, XBEE_TX_PIN);
 File logFile;
 String logFileName;
 
-#define SLOGFLN(X) {Serial.println(F((X)));XBeeSerial.println(F((X)));logFile.println(F((X)));logFile.flush();}
-#define SLOGF(X) {Serial.print(F((X)));XBeeSerial.print(F((X)));logFile.print(F((X)));logFile.flush();}
-#define SLOGLN(X) {Serial.println((X));XBeeSerial.println((X));logFile.println((X));logFile.flush();}
-#define SLOG(X) {Serial.print((X));XBeeSerial.print((X));logFile.print((X));logFile.flush();}
+#define SLOGFLN(X) {Serial.println(F((X)));logFile.println(F((X)));logFile.flush();}
+#define SLOGF(X) {Serial.print(F((X)));logFile.print(F((X)));}
+#define SLOGLN(X) {Serial.println((X));logFile.println((X));logFile.flush();}
+#define SLOG(X) {Serial.print((X));logFile.print((X));}
 
 #define ULTRASONIC_ECHO_PIN A1
 #define ULTRASONIC_TRIG_PIN A0
@@ -117,11 +117,11 @@ void setup() {
   pinMode(MOTOR_LIN2, OUTPUT);
 
   // SD init
-  Serial.println(F("SD init"));
+  Serial.println(F("SD init..."));
   if (!SD.begin(10)) {
-    Serial.println(F("SD init failed"));
+    Serial.println(F("failed"));
   }
-  Serial.println(F("SD init done"));
+  Serial.println(F("done"));
 
   // ultrasonic init
   pinMode(ULTRASONIC_ECHO_PIN, INPUT);
@@ -144,12 +144,14 @@ void setup() {
   CAMERA_Init();
 
   // collect and save NINE_Mag data
-  Serial.println(F("Collect and save NINE_Mag data"));
-  if(SD.exists(F("nine.txt"))){
-    SD.remove(F("nine.txt"));
-    Serial.println(F("removed nine.txt"));
+  Serial.println(F("collect mag"));
+  String nineFileName = F("nine.txt");
+  if(SD.exists(nineFileName)){
+    SD.remove(nineFileName);
+    Serial.print(F("removed "));
+    Serial.println(nineFileName);
   }
-  File nineFile = SD.open(F("nine.txt"), FILE_WRITE);
+  File nineFile = SD.open(nineFileName, FILE_WRITE);
   if (nineFile) {
     nineFile.print(F("nine_mag = ["));
     MOTOR_R_FORWARD();
@@ -171,13 +173,14 @@ void setup() {
     MOTOR_L_STOP();
     nineFile.println(F("]"));
     nineFile.close();
-    Serial.println(F("writing to nine.txt success"));
+    Serial.println(F("mag success"));
   }
   else {
-    Serial.println(F("error opening nine.txt"));
+    Serial.print(F("can't open"));
+    Serial.println(nineFileName);
   }
   
-  Serial.println(F("get logfile name"));
+  Serial.println(F("get log name"));
   updated = false;
   while(!updated){
     while (Serial.available() > 0) {
@@ -203,11 +206,9 @@ void setup() {
   logFile = SD.open(logFileName, FILE_WRITE);
   if (logFile) {
     Serial.println(F("opened logfile"));
-    //logFile.close();
-    //SLOGFLN("SD success");
   }
   else {
-    Serial.println(F("error opening logfile"));
+    Serial.println(F("can't open logfile"));
   }
 }
 
@@ -215,7 +216,7 @@ void loop() {
   switch (phase) {
     case 0: {
       SLOGFLN("PHASE 0");
-      SLOGFLN("waiting...");
+      SLOGFLN("waiting");
       delay(PHASE0_WAITING_SECONDS*1000UL);
       phase = 1;
       break;
@@ -245,12 +246,12 @@ void loop() {
           acclStreak = 0;
         }
         if(cdsStreak >= CDS_RELEASE_REQREPS){
-          SLOGFLN("RELEASED: cdsStreak reached reqreps");
+          SLOGFLN("RELEASED: cds satisfied");
           phase = 2;
           break;
         }
         if(acclStreak >= ACCL_RELEASE_REQREPS){
-          SLOGFLN("RELEASED: acclStreak reached reqreps");
+          SLOGFLN("RELEASED: accl satisfied");
           phase = 2;
           break;
         }
@@ -265,7 +266,7 @@ void loop() {
       char acclStreak = 0;
       while(1){
         if(millis() - startTime >= PHASE2_WAITING_SECONDS * 1000UL){
-          SLOGFLN("LANDED: phase2 waiting seconds passed");
+          SLOGFLN("LANDED: time exceeded");
           phase = 3;
           break;
         }
@@ -279,7 +280,7 @@ void loop() {
           acclStreak = 0;
         }
         if(acclStreak >= ACCL_LANDING_REQREPS){
-          SLOGFLN("LANDED: acclStreak reached reqreps");
+          SLOGFLN("LANDED: accl satisfied");
           phase = 3;
           break;
         }
@@ -290,11 +291,11 @@ void loop() {
     case 3: {
       SLOGFLN("PHASE 3");
       // Heat nichrome wire
-      SLOGFLN("Start heating nichrome");
+      SLOGFLN("heat nichrome");
       digitalWrite(NICHROME_PIN, HIGH);
       delay(HEATING_SECONDS * 1000UL);
       digitalWrite(NICHROME_PIN, LOW);
-      SLOGFLN("End heating nichrome");
+      SLOGFLN("finished");
       phase = 4;
       break;
     }
@@ -304,7 +305,7 @@ void loop() {
       while(1){
         SLOGF("moveCount: ");
         SLOGLN(moveCount);
-        SLOGFLN("Get GPS data");
+        SLOGFLN("get GPS data");
         updated = false;
         while(!updated){
           while (Serial.available() > 0) {
@@ -323,12 +324,12 @@ void loop() {
               SLOGF("LAT=");SLOGLN(lat);
               SLOGF("LONG=");SLOGLN(lng);
               SLOGF("ALT=");SLOGLN(alt);
-              SLOGF("YEAR=");SLOGLN(year);
-              SLOGF("MONTH=");SLOGLN(month);
-              SLOGF("DAY=");SLOGLN(day);
-              SLOGF("HOUR=");SLOGLN(hour);
-              SLOGF("MINUTE=");SLOGLN(minute);
-              SLOGF("SECOND=");SLOGLN(second);
+              SLOGF("Y=");SLOGLN(year);
+              SLOGF("M=");SLOGLN(month);
+              SLOGF("D=");SLOGLN(day);
+              SLOGF("H=");SLOGLN(hour);
+              SLOGF("M=");SLOGLN(minute);
+              SLOGF("S=");SLOGLN(second);
               updated = true;
               break;
             }
@@ -337,9 +338,9 @@ void loop() {
         float latDiff = (TARGET_LAT - lat) * M_PER_LAT;
         float lngDiff = (TARGET_LNG - lng) * M_PER_LNG;
         float distance = sqrt(latDiff * latDiff + lngDiff * lngDiff);
-        SLOGF("distance: ");SLOGLN(distance);
+        SLOGF("dist: ");SLOGLN(distance);
         float targetRad = fmod(atan2(latDiff, lngDiff) + 2.0*PI, 2.0*PI);
-        SLOGF("target degree: ");SLOGLN(targetRad * 180.0 / PI);
+        SLOGF("target deg: ");SLOGLN(targetRad * 180.0 / PI);
         
         if(distance <= GOAL_DISTANCE){
           SLOGFLN("REACHED GOAL");
@@ -351,18 +352,18 @@ void loop() {
         for(int i = 0;i < ROTATE_REPS;i++){
           SLOGF("rotate rep: ");
           SLOGLN(i);
-          SLOGFLN("Get Mag data");
+          SLOGFLN("get mag data");
           NINE_Mag();
           cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag(), NINE_xMag()) + 2.0*PI, 2.0*PI);
-          SLOGF("cansat degree: ");SLOGLN(cansatRad * 180.0 / PI);
+          SLOGF("cansat deg: ");SLOGLN(cansatRad * 180.0 / PI);
 
           leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
           rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
-          SLOGF("left degree: ");SLOGLN(leftRad * 180.0 / PI);
-          SLOGF("right degree: ");SLOGLN(rightRad * 180.0 / PI);
+          SLOGF("left deg: ");SLOGLN(leftRad * 180.0 / PI);
+          SLOGF("right deg: ");SLOGLN(rightRad * 180.0 / PI);
           
           if(leftRad < rightRad){
-            SLOGF("turn left for ");
+            SLOGF("turn L ");
             SLOGLN(1000*leftRad/RAD_PER_S_L);
             MOTOR_R_FORWARD();
             MOTOR_L_BACKWARD();
@@ -370,7 +371,7 @@ void loop() {
             MOTOR_R_STOP();
             MOTOR_L_STOP();
           }else{
-            SLOGF("turn right for ");
+            SLOGF("turn R ");
             SLOGLN(1000*rightRad/RAD_PER_S_R);
             MOTOR_L_FORWARD();
             MOTOR_R_BACKWARD();
@@ -381,18 +382,18 @@ void loop() {
         }
         NINE_Mag();
         cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag(), NINE_xMag()) + 2.0*PI, 2.0*PI);
-        SLOGF("final cansat degree: ");SLOGLN(cansatRad * 180.0 / PI);
+        SLOGF("final cansat deg: ");SLOGLN(cansatRad * 180.0 / PI);
 
         leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
         rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
-        SLOGF("final left degree: ");SLOGLN(leftRad * 180.0 / PI);
-        SLOGF("final right degree: ");SLOGLN(rightRad * 180.0 / PI);
+        SLOGF("left deg: ");SLOGLN(leftRad * 180.0 / PI);
+        SLOGF("right deg: ");SLOGLN(rightRad * 180.0 / PI);
 
         if(leftRad > ROTATE_RAD_THRESHOLD && rightRad > ROTATE_RAD_THRESHOLD){
-          SLOGFLN("direction change failed");
+          SLOGFLN("dir change failed");
         }
 
-        SLOGF("move forward for ");
+        SLOGF("move forward ");
         SLOGLN(1000*distance/M_PER_S);
         MOTOR_R_FORWARD();
         MOTOR_L_FORWARD();
