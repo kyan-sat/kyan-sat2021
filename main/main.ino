@@ -71,8 +71,23 @@ unsigned char phase = 3;
 #define M_PER_S 0.1
 
 // control constants
+#define PHASE0_WAITING_SECONDS 600
+
+#define CDS_RELEASE_HLIM 600
+#define CDS_RELEASE_REQREPS 10
+#define ACCL_RELEASE_LLIM 0.00001
+#define ACCL_RELEASE_HLIM 5.0
+#define ACCL_RELEASE_REQREPS 10
+
+#define PHASE2_WAITING_SECONDS 60
+#define ACCL_DIFF_HLIM 0.2
+#define ACCL_LANDING_REQREPS 10
+
+#define HEATING_SECONDS 10
+
 #define ROTATE_REPS 3
 #define ROTATE_RAD_THRESHOLD (PI * 30.0 / 180.0)
+#define GOAL_DISTANCE 1.0
 
 void setup() {
   pinMode(9, OUTPUT);
@@ -186,111 +201,197 @@ void setup() {
     //SLOGFLN("SD success");
   }
   else {
-    Serial.println(F("error opening log.txt"));
+    Serial.println(F("error opening logfile"));
   }
 }
 
 void loop() {
-  SLOGFLN("----------------------------------------");
   switch (phase) {
     case 0:
+      SLOGFLN("PHASE 0");
+      SLOGFLN("waiting...");
+      delay(PHASE0_WAITING_SECONDS*1000UL);
+      phase = 1;
+      break;
+    case 1:
+      SLOGFLN("PHASE 1");
+      int rawCds;
+      float absoluteAccl;
+      char cdsStreak = 0;
+      char acclStreak = 0;
+      while(1){
+        rawCds = analogRead(CDS_PIN);
+        SLOGF("CdS: ");
+        SLOGLN(rawCds);
+        if(rawCds <= CDS_RELEASE_HLIM){
+          cdsStreak++;
+        }else{
+          cdsStreak = 0;
+        }
+        NINE_Accl();
+        absoluteAccl = sqrt(NINE_xAccl()*NINE_xAccl()+NINE_yAccl()*NINE_yAccl()+NINE_zAccl()*NINE_zAccl());
+        SLOGF("accl: ");
+        SLOGLN(absoluteAccl);
+        if(ACCL_RELEASE_LLIM <= absoluteAccl && absoluteAccl <= ACCL_RELEASE_HLIM){
+          acclStreak++;
+        }else{
+          acclStreak = 0;
+        }
+        if(cdsStreak >= CDS_RELEASE_REQREPS){
+          SLOGFLN("RELEASED: cdsStreak reached reqreps");
+          phase = 2;
+          break;
+        }
+        if(acclStreak >= ACCL_RELEASE_REQREPS){
+          SLOGFLN("RELEASED: acclStreak reached reqreps");
+          phase = 2;
+          break;
+        }
+        delay(50);
+      }
+      break;
+    case 2:
+      SLOGFLN("PHASE 2");
+      unsigned long startTime = millis();
+      float absoluteAccl = 0, absoluteAcclPrev = 10;
+      char acclStreak = 0;
+      while(1){
+        if(millis() - startTime >= PHASE2_WAITING_SECONDS * 1000UL){
+          SLOGFLN("LANDED: phase2 waiting seconds passed");
+          phase = 3;
+          break;
+        }
+        NINE_Accl();
+        absoluteAccl = sqrt(NINE_xAccl()*NINE_xAccl()+NINE_yAccl()*NINE_yAccl()+NINE_zAccl()*NINE_zAccl());
+        SLOGF("accl: ");
+        SLOGLN(absoluteAccl);
+        if(abs(absoluteAccl - absoluteAcclPrev) <= ACCL_DIFF_HLIM){
+          acclStreak++;
+        }else{
+          acclStreak = 0;
+        }
+        if(acclStreak >= ACCL_LANDING_REQREPS){
+          SLOGFLN("LANDED: acclStreak reached reqreps");
+          phase = 3;
+          break;
+        }
+        delay(50);
+      }
+      break;
+    case 3:
+      SLOGFLN("PHASE 3");
       // Heat nichrome wire
       SLOGFLN("Start heating nichrome");
       digitalWrite(NICHROME_PIN, HIGH);
-      delay(1000);
+      delay(HEATING_SECONDS * 1000UL);
       digitalWrite(NICHROME_PIN, LOW);
       SLOGFLN("End heating nichrome");
-    case 3:
-      SLOGFLN("PHASE 3");
-      SLOGFLN("Get GPS data");
-      updated = false;
-      while(!updated){
-        while (Serial.available() > 0) {
-          char c = Serial.read();
-          gps.encode(c);
-          if (gps.location.isUpdated()) {
-            lat = gps.location.lat();
-            lng = gps.location.lng();
-            alt = gps.altitude.meters();
-            year = gps.date.year();
-            month = gps.date.month();
-            day = gps.date.day();
-            hour = gps.time.hour();
-            minute = gps.time.minute();
-            second = gps.time.second();
-            SLOGF("LAT=");SLOGLN(lat);
-            SLOGF("LONG=");SLOGLN(lng);
-            SLOGF("ALT=");SLOGLN(alt);
-            SLOGF("YEAR=");SLOGLN(year);
-            SLOGF("MONTH=");SLOGLN(month);
-            SLOGF("DAY=");SLOGLN(day);
-            SLOGF("HOUR=");SLOGLN(hour);
-            SLOGF("MINUTE=");SLOGLN(minute);
-            SLOGF("SECOND=");SLOGLN(second);
-            updated = true;
-            break;
+      phase = 4;
+      break;
+    case 4:
+      SLOGFLN("PHASE 4");
+      char moveCount = 0;
+      while(1){
+        SLOGF("moveCount: ");
+        SLOGLN(moveCount);
+        SLOGFLN("Get GPS data");
+        updated = false;
+        while(!updated){
+          while (Serial.available() > 0) {
+            char c = Serial.read();
+            gps.encode(c);
+            if (gps.location.isUpdated()) {
+              lat = gps.location.lat();
+              lng = gps.location.lng();
+              alt = gps.altitude.meters();
+              year = gps.date.year();
+              month = gps.date.month();
+              day = gps.date.day();
+              hour = gps.time.hour();
+              minute = gps.time.minute();
+              second = gps.time.second();
+              SLOGF("LAT=");SLOGLN(lat);
+              SLOGF("LONG=");SLOGLN(lng);
+              SLOGF("ALT=");SLOGLN(alt);
+              SLOGF("YEAR=");SLOGLN(year);
+              SLOGF("MONTH=");SLOGLN(month);
+              SLOGF("DAY=");SLOGLN(day);
+              SLOGF("HOUR=");SLOGLN(hour);
+              SLOGF("MINUTE=");SLOGLN(minute);
+              SLOGF("SECOND=");SLOGLN(second);
+              updated = true;
+              break;
+            }
           }
         }
-      }
-      float latDiff = (TARGET_LAT - lat) * M_PER_LAT;
-      float lngDiff = (TARGET_LNG - lng) * M_PER_LNG;
-      float distance = sqrt(latDiff * latDiff + lngDiff * lngDiff);
-      float targetRad = fmod(atan2(latDiff, lngDiff) + 2.0*PI, 2.0*PI);
-      SLOGF("target degree: ");SLOGLN(targetRad * 180.0 / PI);
+        float latDiff = (TARGET_LAT - lat) * M_PER_LAT;
+        float lngDiff = (TARGET_LNG - lng) * M_PER_LNG;
+        float distance = sqrt(latDiff * latDiff + lngDiff * lngDiff);
+        SLOGF("distance: ");SLOGLN(distance);
+        float targetRad = fmod(atan2(latDiff, lngDiff) + 2.0*PI, 2.0*PI);
+        SLOGF("target degree: ");SLOGLN(targetRad * 180.0 / PI);
+        
+        if(distance <= GOAL_DISTANCE){
+          SLOGFLN("REACHED GOAL");
+          phase = 10;
+          break;
+        }
+        
+        float cansatRad, leftRad, rightRad;
+        for(int i = 0;i < ROTATE_REPS;i++){
+          SLOGF("rotate rep: ");
+          SLOGLN(i);
+          SLOGFLN("Get Mag data");
+          NINE_Mag();
+          cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag(), NINE_xMag()) + 2.0*PI, 2.0*PI);
+          SLOGF("cansat degree: ");SLOGLN(cansatRad * 180.0 / PI);
 
-      float cansatRad, leftRad, rightRad;
-      for(int i = 0;i < ROTATE_REPS;i++){
-        SLOGF("rotate rep: ");
-        SLOGLN(i);
-        SLOGFLN("Get Mag data");
+          leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
+          rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
+          SLOGF("left degree: ");SLOGLN(leftRad * 180.0 / PI);
+          SLOGF("right degree: ");SLOGLN(rightRad * 180.0 / PI);
+          
+          if(leftRad < rightRad){
+            SLOGF("turn left for ");
+            SLOGLN(1000*leftRad/RAD_PER_S_L);
+            MOTOR_R_FORWARD();
+            MOTOR_L_BACKWARD();
+            delay(1000*leftRad/RAD_PER_S_L);
+            MOTOR_R_STOP();
+            MOTOR_L_STOP();
+          }else{
+            SLOGF("turn right for ");
+            SLOGLN(1000*rightRad/RAD_PER_S_R);
+            MOTOR_L_FORWARD();
+            MOTOR_R_BACKWARD();
+            delay(1000*rightRad/RAD_PER_S_R);
+            MOTOR_L_STOP();
+            MOTOR_R_STOP();
+          }
+        }
         NINE_Mag();
         cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag(), NINE_xMag()) + 2.0*PI, 2.0*PI);
-        SLOGF("cansat degree: ");SLOGLN(cansatRad * 180.0 / PI);
+        SLOGF("final cansat degree: ");SLOGLN(cansatRad * 180.0 / PI);
 
         leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
         rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
-        SLOGF("left degree: ");SLOGLN(leftRad * 180.0 / PI);
-        SLOGF("right degree: ");SLOGLN(rightRad * 180.0 / PI);
-        
-        if(leftRad < rightRad){
-          SLOGF("turn left ");
-          SLOGLN(1000*leftRad/RAD_PER_S_L);
-          MOTOR_R_FORWARD();
-          MOTOR_L_BACKWARD();
-          delay(1000*leftRad/RAD_PER_S_L);
-          MOTOR_R_STOP();
-          MOTOR_L_STOP();
-        }else{
-          SLOGF("turn right ");
-          SLOGLN(1000*rightRad/RAD_PER_S_R);
-          MOTOR_L_FORWARD();
-          MOTOR_R_BACKWARD();
-          delay(1000*rightRad/RAD_PER_S_R);
-          MOTOR_L_STOP();
-          MOTOR_R_STOP();
+        SLOGF("final left degree: ");SLOGLN(leftRad * 180.0 / PI);
+        SLOGF("final right degree: ");SLOGLN(rightRad * 180.0 / PI);
+
+        if(leftRad > ROTATE_RAD_THRESHOLD && rightRad > ROTATE_RAD_THRESHOLD){
+          SLOGFLN("direction change failed");
         }
+
+        SLOGF("move forward for ");
+        SLOGLN(1000*distance/M_PER_S);
+        MOTOR_R_FORWARD();
+        MOTOR_L_FORWARD();
+        //delay(1000*distance/M_PER_S);
+        delay(10000UL);
+        MOTOR_R_STOP();
+        MOTOR_L_STOP();
+        moveCount++;
       }
-      NINE_Mag();
-      cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag(), NINE_xMag()) + 2.0*PI, 2.0*PI);
-      SLOGF("final cansat degree: ");SLOGLN(cansatRad * 180.0 / PI);
-
-      leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
-      rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
-      SLOGF("final left degree: ");SLOGLN(leftRad * 180.0 / PI);
-      SLOGF("final right degree: ");SLOGLN(rightRad * 180.0 / PI);
-
-      if(leftRad > ROTATE_RAD_THRESHOLD && rightRad > ROTATE_RAD_THRESHOLD){
-        SLOGFLN("stucked");
-      }
-
-      SLOGF("move forward ");
-      SLOGLN(1000*distance/M_PER_S);
-      MOTOR_R_FORWARD();
-      MOTOR_L_FORWARD();
-      //delay(1000*distance/M_PER_S);
-      delay(10000);
-      MOTOR_R_STOP();
-      MOTOR_L_STOP();
       break;
     default:
       break;
