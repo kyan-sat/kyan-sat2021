@@ -66,11 +66,13 @@ unsigned char phase = 3;
 #define MAG_OFFSET_Y 0.0
 #define MAG_NORTH (PI * 10.0 / 180.0)
 #define PI 3.14159265
-#define RAD_PER_S_R 0.18
-#define RAD_PER_S_L 0.15
-#define M_PER_S 0.1
+#define RAD_PER_S_R 0.812
+#define RAD_PER_S_L 0.778
+#define M_PER_S 0.0625
 
 // control constants
+#define MAGCOLLECT_ROTATE_RAD (PI * 2.0 * 2.0)
+
 #define PHASE0_WAITING_SECONDS 600
 
 #define CDS_RELEASE_HLIM 600
@@ -152,7 +154,9 @@ void setup() {
     nineFile.print(F("nine_mag = ["));
     MOTOR_R_FORWARD();
     MOTOR_L_BACKWARD();
-    for(int i = 0;i < 200;i++){
+    delay(3000UL);
+    int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
+    for(int i = 0;i < forReps;i++){
       NINE_Mag();
       nineFile.print(F("["));
       nineFile.print(NINE_xMag());
@@ -172,6 +176,8 @@ void setup() {
   else {
     Serial.println(F("error opening nine.txt"));
   }
+  
+  Serial.println(F("get logfile name"));
   updated = false;
   while(!updated){
     while (Serial.available() > 0) {
@@ -207,13 +213,14 @@ void setup() {
 
 void loop() {
   switch (phase) {
-    case 0:
+    case 0: {
       SLOGFLN("PHASE 0");
       SLOGFLN("waiting...");
       delay(PHASE0_WAITING_SECONDS*1000UL);
       phase = 1;
       break;
-    case 1:
+    }
+    case 1: {
       SLOGFLN("PHASE 1");
       int rawCds;
       float absoluteAccl;
@@ -250,7 +257,8 @@ void loop() {
         delay(50);
       }
       break;
-    case 2:
+    }
+    case 2: {
       SLOGFLN("PHASE 2");
       unsigned long startTime = millis();
       float absoluteAccl = 0, absoluteAcclPrev = 10;
@@ -278,7 +286,8 @@ void loop() {
         delay(50);
       }
       break;
-    case 3:
+    }
+    case 3: {
       SLOGFLN("PHASE 3");
       // Heat nichrome wire
       SLOGFLN("Start heating nichrome");
@@ -288,7 +297,8 @@ void loop() {
       SLOGFLN("End heating nichrome");
       phase = 4;
       break;
-    case 4:
+    }
+    case 4: {
       SLOGFLN("PHASE 4");
       char moveCount = 0;
       while(1){
@@ -393,7 +403,9 @@ void loop() {
         moveCount++;
       }
       break;
-    default:
+    }
+    default: {
       break;
+    }
   }
 }
