@@ -58,8 +58,8 @@ unsigned char picCount = 0;
 unsigned char phase = 3;
 
 // constants
-#define TARGET_LAT 35.71361439331066
-#define TARGET_LNG 139.76169713751702
+#define TARGET_LAT 35.714636087650646
+#define TARGET_LNG 139.7620713176752
 #define M_PER_LAT 111092.7384 // https://www.wingfield.gr.jp/archives/9721 lat43
 #define M_PER_LNG 81540.4864
 #define MAG_NORTH (PI * 10.0 / 180.0)
@@ -91,6 +91,7 @@ long xMagOffset, yMagOffset;
 #define HEATING_SECONDS 1.5
 
 #define FORWARD_SECONDS_AFTER_LANDING 3.0
+#define GPS_DISCARD_REPS 6
 #define ROTATE_REPS 3
 #define ROTATE_RAD_THRESHOLD (PI * 30.0 / 180.0)
 #define GOAL_DISTANCE 1.0
@@ -198,11 +199,12 @@ void setup() {
       char c = Serial.read();
       gps.encode(c);
       if (gps.location.isUpdated()) {
+        updated++;
         month = gps.date.month();
         day = gps.date.day();
         hour = gps.time.hour();
         minute = gps.time.minute();
-        if(updated == LOGFILE_REQREPS - 1){
+        if(updated == LOGFILE_REQREPS){
           Serial.println(month);
           Serial.println(day);
           Serial.println(hour);
@@ -210,10 +212,8 @@ void setup() {
           sprintf(logFileName, "%02d%02d%02d%02d.txt", month, day, hour, minute);
           Serial.println(logFileName);
           Serial.println(updated);
-          updated++;
           break;
         }
-        updated++;
       }
     }
   }
@@ -359,12 +359,13 @@ void loop() {
         SLOGF("moveCount ");
         SLOGLN(moveCount);
         SLOGFLN("get GPS");
-        updated = false;
-        while(!updated){
+        updated = 0;
+        while(updated < GPS_DISCARD_REPS){
           while (Serial.available() > 0) {
             char c = Serial.read();
             gps.encode(c);
             if (gps.location.isUpdated()) {
+              updated++;
               lat = gps.location.lat();
               lng = gps.location.lng();
               alt = gps.altitude.meters();
@@ -374,17 +375,21 @@ void loop() {
               hour = gps.time.hour();
               minute = gps.time.minute();
               second = gps.time.second();
-              SLOGF("LAT=");Serial.println(lat, 6);logFile.println(lat, 6);
-              SLOGF("LNG=");Serial.println(lng, 6);logFile.println(lng, 6);
-              SLOGF("ALT=");SLOGLN(alt);
-              SLOGF("Y=");SLOGLN(year);
-              SLOGF("M=");SLOGLN(month);
-              SLOGF("D=");SLOGLN(day);
-              SLOGF("H=");SLOGLN(hour);
-              SLOGF("M=");SLOGLN(minute);
-              SLOGF("S=");SLOGLN(second);
-              updated = true;
-              break;
+              Serial.println(updated);
+              Serial.print(lat, 8);logFile.print(lat, 8);
+              SLOGF(", ");Serial.println(lng, 8);logFile.println(lng, 8);
+              if(updated == GPS_DISCARD_REPS){
+                Serial.print(lat, 8);logFile.print(lat, 8);
+                SLOGF(", ");Serial.println(lng, 8);logFile.println(lng, 8);
+                SLOGF("ALT=");SLOGLN(alt);
+                SLOGF("Y=");SLOGLN(year);
+                SLOGF("M=");SLOGLN(month);
+                SLOGF("D=");SLOGLN(day);
+                SLOGF("H=");SLOGLN(hour);
+                SLOGF("M=");SLOGLN(minute);
+                SLOGF("S=");SLOGLN(second);
+                break;
+              }
             }
           }
         }
