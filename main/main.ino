@@ -18,7 +18,7 @@ unsigned char updated;
 
 #define XBEE_RX_PIN 2
 #define XBEE_TX_PIN 3
-SoftwareSerial XBeeSerial(XBEE_RX_PIN, XBEE_TX_PIN);
+//SoftwareSerial XBeeSerial(XBEE_RX_PIN, XBEE_TX_PIN);
 
 #define NICHROME_PIN 4
 
@@ -26,21 +26,25 @@ SoftwareSerial XBeeSerial(XBEE_RX_PIN, XBEE_TX_PIN);
 #define MOTOR_RIN2 7
 #define MOTOR_LIN1 6
 #define MOTOR_LIN2 5
-void MOTOR_R_FORWARD() {analogWrite(MOTOR_RIN1, 255);analogWrite(MOTOR_RIN2, 0);}
-void MOTOR_R_BACKWARD() {analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 255);}
-void MOTOR_R_STOP() {analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 0);}
-void MOTOR_L_FORWARD() {analogWrite(MOTOR_LIN1, 255);analogWrite(MOTOR_LIN2, 0);}
-void MOTOR_L_BACKWARD() {analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 255);}
-void MOTOR_L_STOP() {analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 0);}
+void MOTOR_R_FORWARD(){analogWrite(MOTOR_RIN1, 255);analogWrite(MOTOR_RIN2, 0);}
+void MOTOR_R_BACKWARD(){analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 255);}
+void MOTOR_R_STOP(){analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 0);}
+void MOTOR_L_FORWARD(){analogWrite(MOTOR_LIN1, 255);analogWrite(MOTOR_LIN2, 0);}
+void MOTOR_L_BACKWARD(){analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 255);}
+void MOTOR_L_STOP(){analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 0);}
+void MOTOR_FORWARD(){MOTOR_R_FORWARD();MOTOR_L_FORWARD();}
+void MOTOR_TURN_R(){MOTOR_R_BACKWARD();MOTOR_L_FORWARD();}
+void MOTOR_TURN_L(){MOTOR_R_FORWARD();MOTOR_L_BACKWARD();}
+void MOTOR_STOP(){MOTOR_R_STOP();MOTOR_L_STOP();}
 
 #include <SD.h>
 File logFile;
 char logFileName[13];
 
-#define SLOGFLN(X) {Serial.println(F((X)));logFile.println(F((X)));logFile.flush();}
-#define SLOGF(X) {Serial.print(F((X)));logFile.print(F((X)));}
-#define SLOGLN(X) {Serial.println((X));logFile.println((X));logFile.flush();}
-#define SLOG(X) {Serial.print((X));logFile.print((X));}
+template <typename T> void SLOGLN(T X) {Serial.println(X);logFile.println(X);logFile.flush();}
+template <typename T> void SLOG(T X) {Serial.print(X);logFile.print(X);}
+#define SLOGFLN(X) SLOGLN(F(X))
+#define SLOGF(X) SLOG(F(X))
 
 #define ULTRASONIC_ECHO_PIN A1
 #define ULTRASONIC_TRIG_PIN A0
@@ -107,9 +111,9 @@ void setup() {
   }
 
   // XBee init
-  XBeeSerial.begin(9600);
+  //XBeeSerial.begin(9600);
   delay(300);
-  XBeeSerial.listen();
+  //XBeeSerial.listen();
 
   // Nichrome init
   pinMode(NICHROME_PIN, OUTPUT);
@@ -160,8 +164,7 @@ void setup() {
     File nineFile = SD.open(nineFileName, FILE_WRITE);
     if (nineFile) {
       nineFile.print("nine_mag = [");
-      MOTOR_R_FORWARD();
-      MOTOR_L_BACKWARD();
+      MOTOR_TURN_L();
       //delay(3000UL);
       int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
 
@@ -179,8 +182,7 @@ void setup() {
         yMagSum += NINE_yMag();
         delay(100);
       }
-      MOTOR_R_STOP();
-      MOTOR_L_STOP();
+      MOTOR_STOP();
       nineFile.println("]");
       nineFile.close();
       Serial.println("mag success");
@@ -321,16 +323,13 @@ void loop() {
     case 4: {
       SLOGFLN("PHASE 4");
       SLOGFLN("escape");
-      MOTOR_L_FORWARD();
-      MOTOR_R_FORWARD();
+      MOTOR_FORWARD();
       delay(FORWARD_SECONDS_AFTER_LANDING * 1000UL);
-      MOTOR_L_STOP();
-      MOTOR_R_STOP();
+      MOTOR_STOP();
       delay(1000);
       
       SLOGFLN("magOffset");
-      MOTOR_R_FORWARD();
-      MOTOR_L_BACKWARD();
+      MOTOR_TURN_L();
       delay(100);
       int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
 
@@ -348,8 +347,7 @@ void loop() {
         yMagSum += NINE_yMag();
         delay(100);
       }
-      MOTOR_R_STOP();
-      MOTOR_L_STOP();
+      MOTOR_STOP();
       xMagOffset = xMagSum / forReps;
       yMagOffset = yMagSum / forReps;
       SLOGFLN("mag success");
@@ -423,19 +421,15 @@ void loop() {
           if(leftRad < rightRad){
             SLOGF("turn L ");
             SLOGLN(1000*leftRad/RAD_PER_S_L);
-            MOTOR_R_FORWARD();
-            MOTOR_L_BACKWARD();
+            MOTOR_TURN_L();
             delay(1000*leftRad/RAD_PER_S_L);
-            MOTOR_R_STOP();
-            MOTOR_L_STOP();
+            MOTOR_STOP();
           }else{
             SLOGF("turn R ");
             SLOGLN(1000*rightRad/RAD_PER_S_R);
-            MOTOR_L_FORWARD();
-            MOTOR_R_BACKWARD();
+            MOTOR_TURN_R();
             delay(1000*rightRad/RAD_PER_S_R);
-            MOTOR_L_STOP();
-            MOTOR_R_STOP();
+            MOTOR_STOP();
           }
         }
         NINE_Mag();
@@ -455,12 +449,10 @@ void loop() {
 
         SLOGF("move forward ");
         SLOGLN(1000*distance/M_PER_S);
-        MOTOR_R_FORWARD();
-        MOTOR_L_FORWARD();
+        MOTOR_FORWARD();
         //delay(1000*distance/M_PER_S);
         delay(10000UL);
-        MOTOR_R_STOP();
-        MOTOR_L_STOP();
+        MOTOR_STOP();
         moveCount++;
       }
       break;
