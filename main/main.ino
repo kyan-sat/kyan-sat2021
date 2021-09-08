@@ -13,7 +13,7 @@ unsigned char hour;
 unsigned char minute;
 unsigned char second;
 double alt; // in meters
-boolean updated;
+unsigned char updated;
 
 
 #define XBEE_RX_PIN 2
@@ -31,11 +31,11 @@ SoftwareSerial XBeeSerial(XBEE_RX_PIN, XBEE_TX_PIN);
 #define MOTOR_R_STOP() {analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 0);}
 #define MOTOR_L_FORWARD() {analogWrite(MOTOR_LIN1, 255);analogWrite(MOTOR_LIN2, 0);}
 #define MOTOR_L_BACKWARD() {analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 255);}
-#define MOTOR_L_STOP() {analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 0);}
+#define MOTOR_L_STOP() {analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 0);}
 
 #include <SD.h>
 File logFile;
-String logFileName;
+char logFileName[13];
 
 #define SLOGFLN(X) {Serial.println(F((X)));logFile.println(F((X)));logFile.flush();}
 #define SLOGF(X) {Serial.print(F((X)));logFile.print(F((X)));}
@@ -55,15 +55,13 @@ unsigned char picCount = 0;
 
 #include "camera.h"
 
-unsigned char phase = 3;
+unsigned char phase = 0;
 
 // constants
 #define TARGET_LAT 35.71361439331066
 #define TARGET_LNG 139.76169713751702
 #define M_PER_LAT 111092.7384 // https://www.wingfield.gr.jp/archives/9721 lat43
 #define M_PER_LNG 1359.0081
-#define MAG_OFFSET_X 0.0
-#define MAG_OFFSET_Y 0.0
 #define MAG_NORTH (PI * 10.0 / 180.0)
 #define PI 3.14159265
 #define RAD_PER_S_R 0.812
@@ -72,6 +70,9 @@ unsigned char phase = 3;
 
 // control constants
 #define MAGCOLLECT_ROTATE_RAD (PI * 2.0 * 2.0)
+long xMagOffset, yMagOffset;
+
+#define LOGFILE_REQREPS 3
 
 #define PHASE0_WAITING_SECONDS 600
 
@@ -85,7 +86,7 @@ unsigned char phase = 3;
 #define ACCL_DIFF_HLIM 0.2
 #define ACCL_LANDING_REQREPS 10
 
-#define HEATING_SECONDS 10
+#define HEATING_SECONDS 1.5
 
 #define ROTATE_REPS 3
 #define ROTATE_RAD_THRESHOLD (PI * 30.0 / 180.0)
@@ -153,36 +154,42 @@ void setup() {
   }
   File nineFile = SD.open(nineFileName, FILE_WRITE);
   if (nineFile) {
-    nineFile.print(F("nine_mag = ["));
+    nineFile.print("nine_mag = [");
     MOTOR_R_FORWARD();
     MOTOR_L_BACKWARD();
-    delay(3000UL);
+    //delay(3000UL);
     int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
+
+    long xMagSum = 0, yMagSum = 0;
     for(int i = 0;i < forReps;i++){
       NINE_Mag();
-      nineFile.print(F("["));
+      nineFile.print("[");
       nineFile.print(NINE_xMag());
-      nineFile.print(F(", "));
+      nineFile.print(", ");
       nineFile.print(NINE_yMag());
-      nineFile.print(F(", "));
+      nineFile.print(", ");
       nineFile.print(NINE_zMag());
-      nineFile.println(F("],"));
+      nineFile.println("],");
+      xMagSum += NINE_xMag();
+      yMagSum += NINE_yMag();
       delay(100);
     }
     MOTOR_R_STOP();
     MOTOR_L_STOP();
-    nineFile.println(F("]"));
+    nineFile.println("]");
     nineFile.close();
-    Serial.println(F("mag success"));
+    Serial.println("mag success");
+    xMagOffset = xMagSum / forReps;
+    yMagOffset = yMagSum / forReps;
   }
   else {
-    Serial.print(F("can't open"));
+    Serial.print("can't open");
     Serial.println(nineFileName);
   }
   
-  Serial.println(F("get log name"));
-  updated = false;
-  while(!updated){
+  Serial.println(F("log name"));
+  updated = 0;
+  while(updated < LOGFILE_REQREPS){
     while (Serial.available() > 0) {
       char c = Serial.read();
       gps.encode(c);
@@ -191,24 +198,32 @@ void setup() {
         day = gps.date.day();
         hour = gps.time.hour();
         minute = gps.time.minute();
-        logFileName = String(month*1000000+day*10000+hour*100+minute);
-        Serial.println(logFileName);
-        updated = true;
-        break;
+        if(updated == LOGFILE_REQREPS - 1){
+          Serial.println(month);
+          Serial.println(day);
+          Serial.println(hour);
+          Serial.println(minute);
+          sprintf(logFileName, "%02d%02d%02d%02d.txt", month, day, hour, minute);
+          Serial.println(logFileName);
+          Serial.println(updated);
+          updated++;
+          break;
+        }
+        updated++;
       }
     }
   }
 
   if(SD.exists(logFileName)){
     SD.remove(logFileName);
-    Serial.println(F("removed logfile"));
+    Serial.println(F("removed log"));
   }
   logFile = SD.open(logFileName, FILE_WRITE);
   if (logFile) {
-    Serial.println(F("opened logfile"));
+    Serial.println(F("opened log"));
   }
   else {
-    Serial.println(F("can't open logfile"));
+    Serial.println(F("can't open log"));
   }
 }
 
@@ -229,7 +244,7 @@ void loop() {
       char acclStreak = 0;
       while(1){
         rawCds = analogRead(CDS_PIN);
-        SLOGF("CdS: ");
+        SLOGF("CdS ");
         SLOGLN(rawCds);
         if(rawCds <= CDS_RELEASE_HLIM){
           cdsStreak++;
@@ -238,7 +253,7 @@ void loop() {
         }
         NINE_Accl();
         absoluteAccl = sqrt(NINE_xAccl()*NINE_xAccl()+NINE_yAccl()*NINE_yAccl()+NINE_zAccl()*NINE_zAccl());
-        SLOGF("accl: ");
+        SLOGF("accl ");
         SLOGLN(absoluteAccl);
         if(ACCL_RELEASE_LLIM <= absoluteAccl && absoluteAccl <= ACCL_RELEASE_HLIM){
           acclStreak++;
@@ -246,12 +261,12 @@ void loop() {
           acclStreak = 0;
         }
         if(cdsStreak >= CDS_RELEASE_REQREPS){
-          SLOGFLN("RELEASED: cds satisfied");
+          SLOGFLN("RELEASED cds ok");
           phase = 2;
           break;
         }
         if(acclStreak >= ACCL_RELEASE_REQREPS){
-          SLOGFLN("RELEASED: accl satisfied");
+          SLOGFLN("RELEASED accl ok");
           phase = 2;
           break;
         }
@@ -266,13 +281,13 @@ void loop() {
       char acclStreak = 0;
       while(1){
         if(millis() - startTime >= PHASE2_WAITING_SECONDS * 1000UL){
-          SLOGFLN("LANDED: time exceeded");
+          SLOGFLN("LANDED time exceeded");
           phase = 3;
           break;
         }
         NINE_Accl();
         absoluteAccl = sqrt(NINE_xAccl()*NINE_xAccl()+NINE_yAccl()*NINE_yAccl()+NINE_zAccl()*NINE_zAccl());
-        SLOGF("accl: ");
+        SLOGF("accl ");
         SLOGLN(absoluteAccl);
         if(abs(absoluteAccl - absoluteAcclPrev) <= ACCL_DIFF_HLIM){
           acclStreak++;
@@ -280,7 +295,7 @@ void loop() {
           acclStreak = 0;
         }
         if(acclStreak >= ACCL_LANDING_REQREPS){
-          SLOGFLN("LANDED: accl satisfied");
+          SLOGFLN("LANDED accl ok");
           phase = 3;
           break;
         }
@@ -301,11 +316,11 @@ void loop() {
     }
     case 4: {
       SLOGFLN("PHASE 4");
-      char moveCount = 0;
+      int moveCount = 0;
       while(1){
-        SLOGF("moveCount: ");
+        SLOGF("moveCount ");
         SLOGLN(moveCount);
-        SLOGFLN("get GPS data");
+        SLOGFLN("get GPS");
         updated = false;
         while(!updated){
           while (Serial.available() > 0) {
@@ -321,8 +336,8 @@ void loop() {
               hour = gps.time.hour();
               minute = gps.time.minute();
               second = gps.time.second();
-              SLOGF("LAT=");SLOGLN(lat);
-              SLOGF("LONG=");SLOGLN(lng);
+              SLOGF("LAT=");Serial.println(lat, 6);logFile.println(lat, 6);
+              SLOGF("LNG=");Serial.println(lng, 6);logFile.println(lng, 6);
               SLOGF("ALT=");SLOGLN(alt);
               SLOGF("Y=");SLOGLN(year);
               SLOGF("M=");SLOGLN(month);
@@ -338,9 +353,9 @@ void loop() {
         float latDiff = (TARGET_LAT - lat) * M_PER_LAT;
         float lngDiff = (TARGET_LNG - lng) * M_PER_LNG;
         float distance = sqrt(latDiff * latDiff + lngDiff * lngDiff);
-        SLOGF("dist: ");SLOGLN(distance);
+        SLOGF("dist ");SLOGLN(distance);
         float targetRad = fmod(atan2(latDiff, lngDiff) + 2.0*PI, 2.0*PI);
-        SLOGF("target deg: ");SLOGLN(targetRad * 180.0 / PI);
+        SLOGF("T-deg ");SLOGLN(targetRad * 180.0 / PI);
         
         if(distance <= GOAL_DISTANCE){
           SLOGFLN("REACHED GOAL");
@@ -350,17 +365,17 @@ void loop() {
         
         float cansatRad, leftRad, rightRad;
         for(int i = 0;i < ROTATE_REPS;i++){
-          SLOGF("rotate rep: ");
+          SLOGF("rotate rep ");
           SLOGLN(i);
-          SLOGFLN("get mag data");
+          SLOGFLN("get mag");
           NINE_Mag();
-          cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag(), NINE_xMag()) + 2.0*PI, 2.0*PI);
-          SLOGF("cansat deg: ");SLOGLN(cansatRad * 180.0 / PI);
+          cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag() - yMagOffset, NINE_xMag() - xMagOffset) + 2.0*PI, 2.0*PI);
+          SLOGF("C-deg ");SLOGLN(cansatRad * 180.0 / PI);
 
           leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
           rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
-          SLOGF("left deg: ");SLOGLN(leftRad * 180.0 / PI);
-          SLOGF("right deg: ");SLOGLN(rightRad * 180.0 / PI);
+          SLOGF("Ldeg ");SLOGLN(leftRad * 180.0 / PI);
+          SLOGF("Rdeg ");SLOGLN(rightRad * 180.0 / PI);
           
           if(leftRad < rightRad){
             SLOGF("turn L ");
@@ -381,16 +396,18 @@ void loop() {
           }
         }
         NINE_Mag();
-        cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag(), NINE_xMag()) + 2.0*PI, 2.0*PI);
-        SLOGF("final cansat deg: ");SLOGLN(cansatRad * 180.0 / PI);
+        cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag() - yMagOffset, NINE_xMag() - xMagOffset) + 2.0*PI, 2.0*PI);
+        SLOGF("final C-deg ");SLOGLN(cansatRad * 180.0 / PI);
 
         leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
         rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
-        SLOGF("left deg: ");SLOGLN(leftRad * 180.0 / PI);
-        SLOGF("right deg: ");SLOGLN(rightRad * 180.0 / PI);
+        SLOGF("Ldeg ");SLOGLN(leftRad * 180.0 / PI);
+        SLOGF("Rdeg ");SLOGLN(rightRad * 180.0 / PI);
 
         if(leftRad > ROTATE_RAD_THRESHOLD && rightRad > ROTATE_RAD_THRESHOLD){
           SLOGFLN("dir change failed");
+        }else{
+          //SLOGFLN("dcsuccess");
         }
 
         SLOGF("move forward ");
