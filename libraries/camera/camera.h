@@ -6,7 +6,7 @@
 #define CAMERA_RX_PIN  A2
 #define CAMERA_TX_PIN  A3
 
-#define PIC_PKT_LEN    128                  //data length of each read, dont set this too big because ram is limited
+#define PIC_PKT_LEN    16                  //data length of each read, dont set this too big because ram is limited
 #define PIC_FMT_VGA    7
 #define PIC_FMT_CIF    5
 #define PIC_FMT_OCIF   3

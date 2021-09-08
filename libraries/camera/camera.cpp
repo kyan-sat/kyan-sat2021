@@ -149,6 +149,15 @@ void GetData(String picName) {
     SD.remove(picName);
   }
 
+  /*File test = SD.open("camtest.txt", FILE_WRITE);
+  if (test) {
+    Serial.println(F("opened camtest"));
+    test.println("uoooo");
+  }
+  else {
+    Serial.println(F("can't open camtest"));
+  }
+  test.close();*/
   myFile = SD.open(picName, FILE_WRITE);
   if (!myFile) {
     Serial.println(F("myFile open failed"));

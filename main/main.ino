@@ -54,10 +54,21 @@ double distance;
 #include "nine.h"
 
 #define CDS_PIN A6
-String picName = "link";
-unsigned char picCount = 0;
 
 #include "camera.h"
+void takePicture(String s){
+  logFile.close();
+  preCapture();
+  Capture();
+  GetData(s);
+  logFile = SD.open(logFileName, FILE_WRITE);
+  if (logFile) {
+    Serial.println(F("opened log"));
+  }
+  else {
+    Serial.println(F("can't open log"));
+  }
+}
 
 unsigned char phase = 3;
 
@@ -238,12 +249,14 @@ void loop() {
     case 0: {
       SLOGFLN("PHASE 0");
       SLOGFLN("waiting");
+      takePicture("a.jpg");
       delay(PHASE0_WAITING_SECONDS*1000UL);
       phase = 1;
       break;
     }
     case 1: {
       SLOGFLN("PHASE 1");
+      takePicture("b.jpg");
       int rawCds;
       float absoluteAccl;
       char cdsStreak = 0;
@@ -311,6 +324,7 @@ void loop() {
     }
     case 3: {
       SLOGFLN("PHASE 3");
+      takePicture(F("p3.jpg"));
       // Heat nichrome wire
       SLOGFLN("heat nichrome");
       digitalWrite(NICHROME_PIN, HIGH);
@@ -322,6 +336,7 @@ void loop() {
     }
     case 4: {
       SLOGFLN("PHASE 4");
+      takePicture(F("p4.jpg"));
       SLOGFLN("escape");
       MOTOR_FORWARD();
       delay(FORWARD_SECONDS_AFTER_LANDING * 1000UL);
@@ -356,6 +371,9 @@ void loop() {
       while(1){
         SLOGF("moveCount ");
         SLOGLN(moveCount);
+        char moveFileName[8];
+        sprintf(moveFileName, "%02d.jpg", moveCount);
+        takePicture(moveFileName);
         SLOGFLN("get GPS");
         updated = 0;
         while(updated < GPS_DISCARD_REPS){
@@ -399,6 +417,7 @@ void loop() {
         SLOGF("T-deg ");SLOGLN(targetRad * 180.0 / PI);
         
         if(distance <= GOAL_DISTANCE){
+          takePicture(F("g.jpg"));
           SLOGFLN("REACHED GOAL");
           phase = 10;
           break;
