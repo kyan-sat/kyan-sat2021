@@ -26,12 +26,12 @@ SoftwareSerial XBeeSerial(XBEE_RX_PIN, XBEE_TX_PIN);
 #define MOTOR_RIN2 7
 #define MOTOR_LIN1 6
 #define MOTOR_LIN2 5
-#define MOTOR_R_FORWARD() {analogWrite(MOTOR_RIN1, 255);analogWrite(MOTOR_RIN2, 0);}
-#define MOTOR_R_BACKWARD() {analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 255);}
-#define MOTOR_R_STOP() {analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 0);}
-#define MOTOR_L_FORWARD() {analogWrite(MOTOR_LIN1, 255);analogWrite(MOTOR_LIN2, 0);}
-#define MOTOR_L_BACKWARD() {analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 255);}
-#define MOTOR_L_STOP() {analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 0);}
+void MOTOR_R_FORWARD() {analogWrite(MOTOR_RIN1, 255);analogWrite(MOTOR_RIN2, 0);}
+void MOTOR_R_BACKWARD() {analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 255);}
+void MOTOR_R_STOP() {analogWrite(MOTOR_RIN1, 0);analogWrite(MOTOR_RIN2, 0);}
+void MOTOR_L_FORWARD() {analogWrite(MOTOR_LIN1, 255);analogWrite(MOTOR_LIN2, 0);}
+void MOTOR_L_BACKWARD() {analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 255);}
+void MOTOR_L_STOP() {analogWrite(MOTOR_LIN1, 0);analogWrite(MOTOR_LIN2, 0);}
 
 #include <SD.h>
 File logFile;
@@ -55,13 +55,13 @@ unsigned char picCount = 0;
 
 #include "camera.h"
 
-unsigned char phase = 0;
+unsigned char phase = 3;
 
 // constants
 #define TARGET_LAT 35.71361439331066
 #define TARGET_LNG 139.76169713751702
 #define M_PER_LAT 111092.7384 // https://www.wingfield.gr.jp/archives/9721 lat43
-#define M_PER_LNG 1359.0081
+#define M_PER_LNG 81540.4864
 #define MAG_NORTH (PI * 10.0 / 180.0)
 #define PI 3.14159265
 #define RAD_PER_S_R 0.812
@@ -69,6 +69,8 @@ unsigned char phase = 0;
 #define M_PER_S 0.0625
 
 // control constants
+#define NINE_DEBUG_FLAG 0
+
 #define MAGCOLLECT_ROTATE_RAD (PI * 2.0 * 2.0)
 long xMagOffset, yMagOffset;
 
@@ -88,6 +90,7 @@ long xMagOffset, yMagOffset;
 
 #define HEATING_SECONDS 1.5
 
+#define FORWARD_SECONDS_AFTER_LANDING 3.0
 #define ROTATE_REPS 3
 #define ROTATE_RAD_THRESHOLD (PI * 30.0 / 180.0)
 #define GOAL_DISTANCE 1.0
@@ -145,48 +148,49 @@ void setup() {
   CAMERA_Init();
 
   // collect and save NINE_Mag data
-  Serial.println(F("collect mag"));
-  String nineFileName = F("nine.txt");
-  if(SD.exists(nineFileName)){
-    SD.remove(nineFileName);
-    Serial.print(F("removed "));
-    Serial.println(nineFileName);
-  }
-  File nineFile = SD.open(nineFileName, FILE_WRITE);
-  if (nineFile) {
-    nineFile.print("nine_mag = [");
-    MOTOR_R_FORWARD();
-    MOTOR_L_BACKWARD();
-    //delay(3000UL);
-    int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
-
-    long xMagSum = 0, yMagSum = 0;
-    for(int i = 0;i < forReps;i++){
-      NINE_Mag();
-      nineFile.print("[");
-      nineFile.print(NINE_xMag());
-      nineFile.print(", ");
-      nineFile.print(NINE_yMag());
-      nineFile.print(", ");
-      nineFile.print(NINE_zMag());
-      nineFile.println("],");
-      xMagSum += NINE_xMag();
-      yMagSum += NINE_yMag();
-      delay(100);
+  if(NINE_DEBUG_FLAG){
+    Serial.println(F("collect mag"));
+    String nineFileName = F("nine.txt");
+    if(SD.exists(nineFileName)){
+      SD.remove(nineFileName);
+      Serial.print(F("removed "));
+      Serial.println(nineFileName);
     }
-    MOTOR_R_STOP();
-    MOTOR_L_STOP();
-    nineFile.println("]");
-    nineFile.close();
-    Serial.println("mag success");
-    xMagOffset = xMagSum / forReps;
-    yMagOffset = yMagSum / forReps;
+    File nineFile = SD.open(nineFileName, FILE_WRITE);
+    if (nineFile) {
+      nineFile.print("nine_mag = [");
+      MOTOR_R_FORWARD();
+      MOTOR_L_BACKWARD();
+      //delay(3000UL);
+      int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
+
+      long xMagSum = 0, yMagSum = 0;
+      for(int i = 0;i < forReps;i++){
+        NINE_Mag();
+        nineFile.print("[");
+        nineFile.print(NINE_xMag());
+        nineFile.print(", ");
+        nineFile.print(NINE_yMag());
+        nineFile.print(", ");
+        nineFile.print(NINE_zMag());
+        nineFile.println("],");
+        xMagSum += NINE_xMag();
+        yMagSum += NINE_yMag();
+        delay(100);
+      }
+      MOTOR_R_STOP();
+      MOTOR_L_STOP();
+      nineFile.println("]");
+      nineFile.close();
+      Serial.println("mag success");
+      xMagOffset = xMagSum / forReps;
+      yMagOffset = yMagSum / forReps;
+    }
+    else {
+      Serial.print("can't open");
+      Serial.println(nineFileName);
+    }
   }
-  else {
-    Serial.print("can't open");
-    Serial.println(nineFileName);
-  }
-  
   Serial.println(F("log name"));
   updated = 0;
   while(updated < LOGFILE_REQREPS){
@@ -316,6 +320,40 @@ void loop() {
     }
     case 4: {
       SLOGFLN("PHASE 4");
+      SLOGFLN("escape");
+      MOTOR_L_FORWARD();
+      MOTOR_R_FORWARD();
+      delay(FORWARD_SECONDS_AFTER_LANDING * 1000UL);
+      MOTOR_L_STOP();
+      MOTOR_R_STOP();
+      delay(1000);
+      
+      SLOGFLN("magOffset");
+      MOTOR_R_FORWARD();
+      MOTOR_L_BACKWARD();
+      delay(100);
+      int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
+
+      long xMagSum = 0, yMagSum = 0;
+      for(int i = 0;i < forReps;i++){
+        NINE_Mag();
+        SLOGF("[");
+        SLOG(NINE_xMag());
+        SLOGF(", ");
+        SLOG(NINE_yMag());
+        SLOGF(", ");
+        SLOG(NINE_zMag());
+        SLOGFLN("],");
+        xMagSum += NINE_xMag();
+        yMagSum += NINE_yMag();
+        delay(100);
+      }
+      MOTOR_R_STOP();
+      MOTOR_L_STOP();
+      xMagOffset = xMagSum / forReps;
+      yMagOffset = yMagSum / forReps;
+      SLOGFLN("mag success");
+
       int moveCount = 0;
       while(1){
         SLOGF("moveCount ");
@@ -407,7 +445,7 @@ void loop() {
         if(leftRad > ROTATE_RAD_THRESHOLD && rightRad > ROTATE_RAD_THRESHOLD){
           SLOGFLN("dir change failed");
         }else{
-          //SLOGFLN("dcsuccess");
+          SLOGFLN("dir change success");
         }
 
         SLOGF("move forward ");
