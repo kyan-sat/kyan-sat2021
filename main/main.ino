@@ -48,8 +48,6 @@ template <typename T> void SLOG(T X) {Serial.print(X);logFile.print(X);}
 
 #define ULTRASONIC_ECHO_PIN A1
 #define ULTRASONIC_TRIG_PIN A0
-double duration;
-double distance;
 
 #include "nine.h"
 
@@ -110,8 +108,14 @@ long xMagOffset, yMagOffset;
 #define ROTATE_REPS 3
 #define ROTATE_RAD_THRESHOLD (PI * 30.0 / 180.0)
 #define GOAL_DISTANCE 1.0
-#define GOAL_FOWARD_RATIO 0.8
-#define FIX_FOWARD_FLAG 0
+#define STUCK_DISTANCE_UPPER_LIMIT 0.3
+#define STUCK_FORWARDMS_LOWER_LIMIT 8000UL
+#define STUCK_ESCAPE_FORWARD_MS 5000
+#define POSTURE_ZACCL_UPPER_LIMIT 6.0
+#define OBSTACLE_CM_LIMIT 30
+#define GOAL_FORWARD_RATIO 0.8
+#define FORWARD_UPPER_LIMIT_SECOND 30
+#define FIX_FORWARD_FLAG 0
 
 void setup() {
   pinMode(9, OUTPUT);
@@ -369,7 +373,11 @@ void loop() {
       yMagOffset = yMagSum / forReps;
       SLOGFLN("mag success");
 
+      double oldLat = 0.0, oldLng = 0.0;
+
       int moveCount = 0;
+
+      unsigned long forwardMS = 0;
       while(1){
         SLOGF("moveCount ");
         SLOGLN(moveCount);
@@ -424,6 +432,62 @@ void loop() {
           phase = 10;
           break;
         }
+
+        float forwardLatDiff = (oldLat - lat) * M_PER_LAT;
+        float forwardLngDiff = (oldLng - lng) * M_PER_LNG;
+        oldLat = lat;
+        oldLng = lng;
+        float forwardDistance = sqrt(forwardLatDiff * forwardLatDiff + forwardLngDiff * forwardLngDiff);
+        if(forwardDistance <= STUCK_DISTANCE_UPPER_LIMIT && forwardMS >= STUCK_FORWARDMS_LOWER_LIMIT){
+          SLOGFLN("stucked");
+          forwardMS = STUCK_ESCAPE_FORWARD_MS;
+          NINE_Accl();
+          if(NINE_zAccl() <= POSTURE_ZACCL_UPPER_LIMIT){
+            SLOGFLN("bad posture");
+          }
+
+          float duration;
+          for(int i = 0;i < 5;i++){
+            digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+            delayMicroseconds(2);
+            digitalWrite(ULTRASONIC_TRIG_PIN, HIGH);
+            delayMicroseconds(10);
+            digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+
+            duration = pulseIn(ULTRASONIC_ECHO_PIN, HIGH);
+            delay(500);
+          }
+          if(duration > 0){
+            duration /= 2;
+            double distance = duration * 340 * 100 / 1000000;
+            SLOGF("dis:");
+            SLOG(distance);
+            SLOGFLN(" cm");
+            if(distance <= OBSTACLE_CM_LIMIT){
+              SLOGFLN("obstacle detected");
+            }
+          }else{
+            SLOGFLN("cant use US");
+          }
+          MOTOR_TURN_L();
+          delay(1000);
+          MOTOR_STOP();
+          delay(1000);
+          MOTOR_TURN_R();
+          delay(2000);
+          MOTOR_STOP();
+          delay(1000);
+          MOTOR_TURN_L();
+          delay(3000);
+          MOTOR_STOP();
+          delay(1000);
+          MOTOR_FORWARD();
+          delay(forwardMS);
+          MOTOR_STOP();
+          moveCount++;
+          continue;
+        }
+        
         
         float cansatRad, leftRad, rightRad;
         for(int i = 0;i < ROTATE_REPS;i++){
@@ -470,13 +534,18 @@ void loop() {
 
         SLOGF("move forward ");
         MOTOR_FORWARD();
-        if(FIX_FOWARD_FLAG){
+        if(FIX_FORWARD_FLAG){
           SLOGLN(10000);
-          delay(10000);
+          forwardMS = 10000;
         }else{
-          SLOGLN(1000 * distance * GOAL_FOWARD_RATIO / M_PER_S);
-          delay(1000 * distance * GOAL_FOWARD_RATIO / M_PER_S);
+          forwardMS = 1000UL * distance * GOAL_FORWARD_RATIO / M_PER_S;
+          SLOGLN(forwardMS);
+          if(forwardMS >= FORWARD_UPPER_LIMIT_SECOND * 1000UL){
+            SLOGFLN("forward ul exceed");
+            forwardMS = FORWARD_UPPER_LIMIT_SECOND * 1000UL;
+          }
         }
+        delay(forwardMS);
         MOTOR_STOP();
         moveCount++;
       }
