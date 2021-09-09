@@ -110,6 +110,8 @@ long xMagOffset, yMagOffset;
 #define ROTATE_REPS 3
 #define ROTATE_RAD_THRESHOLD (PI * 30.0 / 180.0)
 #define GOAL_DISTANCE 1.0
+#define GOAL_FOWARD_RATIO 0.8
+#define FIX_FOWARD_FLAG 0
 
 void setup() {
   pinMode(9, OUTPUT);
@@ -467,10 +469,14 @@ void loop() {
         }
 
         SLOGF("move forward ");
-        SLOGLN(1000*distance/M_PER_S);
         MOTOR_FORWARD();
-        //delay(1000*distance/M_PER_S);
-        delay(10000UL);
+        if(FIX_FOWARD_FLAG){
+          SLOGLN(10000);
+          delay(10000);
+        }else{
+          SLOGLN(1000 * distance * GOAL_FOWARD_RATIO / M_PER_S);
+          delay(1000 * distance * GOAL_FOWARD_RATIO / M_PER_S);
+        }
         MOTOR_STOP();
         moveCount++;
       }
