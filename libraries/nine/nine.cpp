@@ -27,7 +27,7 @@ void NINE_Init()
   Wire.write(0x11);  // Select PMU_LPW register
   Wire.write(0x00);  // Normal mode, Sleep duration = 0.5ms
   Wire.endTransmission();
-  delay(100);
+  delay(100);/*
  //------------------------------------------------------------//
   Wire.beginTransmission(Addr_Gyro);
   Wire.write(0x0F);  // Select Range register
@@ -45,7 +45,7 @@ void NINE_Init()
   Wire.write(0x11);  // Select LPM1 register
   Wire.write(0x00);  // Normal mode, Sleep duration = 2ms
   Wire.endTransmission();
-  delay(100);
+  delay(100);*/
  //------------------------------------------------------------//
   Wire.beginTransmission(Addr_Mag);
   Wire.write(0x4B);  // Select Mag register
@@ -105,7 +105,7 @@ void NINE_Accl()
   yAccl = yAccl * 0.0098; // renge +-2g
   zAccl = zAccl * 0.0098; // renge +-2g
 }
-
+/*
 void NINE_Gyro()
 {
   int data[6];
@@ -133,7 +133,7 @@ void NINE_Gyro()
   yGyro = yGyro * 0.0038; //  Full scale = +/- 125 degree/s
   zGyro = zGyro * 0.0038; //  Full scale = +/- 125 degree/s
 }
-
+*/
 void NINE_Mag()
 {
   byte data[8];

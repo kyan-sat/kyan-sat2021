@@ -61,18 +61,18 @@ void takePicture(String s){
   GetData(s);
   logFile = SD.open(logFileName, FILE_WRITE);
   if (logFile) {
-    Serial.println(F("opened log"));
+    SLOGFLN("opened log");
   }
   else {
-    Serial.println(F("can't open log"));
+    SLOGFLN("can't open log");
   }
 }
 
 unsigned char phase = 3;
 
 // constants
-#define TARGET_LAT 35.714636087650646
-#define TARGET_LNG 139.7620713176752
+#define TARGET_LAT 35.71532716056129
+#define TARGET_LNG 139.76193384706642
 #define M_PER_LAT 111092.7384 // https://www.wingfield.gr.jp/archives/9721 lat43
 #define M_PER_LNG 81540.4864
 #define MAG_NORTH (PI * 10.0 / 180.0)
@@ -319,6 +319,7 @@ void loop() {
         }else{
           acclStreak = 0;
         }
+        absoluteAcclPrev = absoluteAccl;
         if(acclStreak >= ACCL_LANDING_REQREPS){
           SLOGFLN("LANDED accl ok");
           phase = 3;
@@ -332,11 +333,11 @@ void loop() {
       SLOGFLN("PHASE 3");
       takePicture(F("p3.jpg"));
       // Heat nichrome wire
-      SLOGFLN("heat nichrome");
+      SLOGFLN("nichrome");
       digitalWrite(NICHROME_PIN, HIGH);
       delay(HEATING_SECONDS * 1000UL);
       digitalWrite(NICHROME_PIN, LOW);
-      SLOGFLN("finished");
+      SLOGFLN("fin");
       phase = 4;
       break;
     }
@@ -349,7 +350,7 @@ void loop() {
       MOTOR_STOP();
       delay(1000);
       
-      SLOGFLN("magOffset");
+      SLOGFLN("magCol");
       MOTOR_TURN_L();
       delay(100);
       int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
@@ -371,7 +372,7 @@ void loop() {
       MOTOR_STOP();
       xMagOffset = xMagSum / forReps;
       yMagOffset = yMagSum / forReps;
-      SLOGFLN("mag success");
+      SLOGFLN("mag ok");
 
       double oldLat = 0.0, oldLng = 0.0;
 
@@ -384,7 +385,7 @@ void loop() {
         char moveFileName[8];
         sprintf(moveFileName, "%02d.jpg", moveCount);
         takePicture(moveFileName);
-        SLOGFLN("get GPS");
+        SLOGFLN("GPS");
         updated = 0;
         while(updated < GPS_DISCARD_REPS){
           while (Serial.available() > 0) {
@@ -393,27 +394,27 @@ void loop() {
             if (gps.location.isUpdated()) {
               updated++;
               lat = gps.location.lat();
-              lng = gps.location.lng();
+              lng = gps.location.lng();/*
               alt = gps.altitude.meters();
               year = gps.date.year();
               month = gps.date.month();
               day = gps.date.day();
               hour = gps.time.hour();
               minute = gps.time.minute();
-              second = gps.time.second();
-              Serial.println(updated);
+              second = gps.time.second();*/
+              SLOGLN(updated);
               Serial.print(lat, 8);logFile.print(lat, 8);
               SLOGF(", ");Serial.println(lng, 8);logFile.println(lng, 8);
               if(updated == GPS_DISCARD_REPS){
                 Serial.print(lat, 8);logFile.print(lat, 8);
-                SLOGF(", ");Serial.println(lng, 8);logFile.println(lng, 8);
+                SLOGF(", ");Serial.println(lng, 8);logFile.println(lng, 8);/*
                 SLOGF("ALT=");SLOGLN(alt);
                 SLOGF("Y=");SLOGLN(year);
                 SLOGF("M=");SLOGLN(month);
                 SLOGF("D=");SLOGLN(day);
                 SLOGF("H=");SLOGLN(hour);
                 SLOGF("M=");SLOGLN(minute);
-                SLOGF("S=");SLOGLN(second);
+                SLOGF("S=");SLOGLN(second);*/
                 break;
               }
             }
@@ -439,7 +440,7 @@ void loop() {
         oldLng = lng;
         float forwardDistance = sqrt(forwardLatDiff * forwardLatDiff + forwardLngDiff * forwardLngDiff);
         if(forwardDistance <= STUCK_DISTANCE_UPPER_LIMIT && forwardMS >= STUCK_FORWARDMS_LOWER_LIMIT){
-          SLOGFLN("stucked");
+          SLOGFLN("stuck");
           forwardMS = STUCK_ESCAPE_FORWARD_MS;
           NINE_Accl();
           if(NINE_zAccl() <= POSTURE_ZACCL_UPPER_LIMIT){
@@ -464,10 +465,10 @@ void loop() {
             SLOG(distance);
             SLOGFLN(" cm");
             if(distance <= OBSTACLE_CM_LIMIT){
-              SLOGFLN("obstacle detected");
+              SLOGFLN("obstcl");
             }
           }else{
-            SLOGFLN("cant use US");
+            SLOGFLN("US error");
           }
           MOTOR_TURN_L();
           delay(1000);
@@ -499,7 +500,7 @@ void loop() {
           SLOGF("C-deg ");SLOGLN(cansatRad * 180.0 / PI);
 
           leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
-          rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
+          rightRad = 2.0*PI-leftRad;
           SLOGF("Ldeg ");SLOGLN(leftRad * 180.0 / PI);
           SLOGF("Rdeg ");SLOGLN(rightRad * 180.0 / PI);
           
@@ -522,7 +523,7 @@ void loop() {
         SLOGF("final C-deg ");SLOGLN(cansatRad * 180.0 / PI);
 
         leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
-        rightRad = fmod(cansatRad - targetRad + 2.0*PI, 2.0*PI);
+        rightRad = 2.0*PI-leftRad;
         SLOGF("Ldeg ");SLOGLN(leftRad * 180.0 / PI);
         SLOGF("Rdeg ");SLOGLN(rightRad * 180.0 / PI);
 
