@@ -47,7 +47,7 @@ void initialize() {/*
   CameraSerial.setTimeout(500);
   while (1)
   {    
-    Serial.println(F("."));
+    //Serial.println(F("."));
     clearRxBuf();
     sendCmd(cmd,6);
     if (CameraSerial.readBytes((char *)resp, 6) != 6)
@@ -63,7 +63,7 @@ void initialize() {/*
   cmd[1] = 0x0e | cameraAddr;
   cmd[2] = 0x0d;
   sendCmd(cmd, 6); //ACK
-  Serial.println(F("\nCamera initialization done."));
+  //Serial.println(F("\nCamera initialization done."));
 }
 
 void preCapture() {
@@ -92,7 +92,6 @@ void Capture() {
                 0};
   unsigned char resp[6];
 
-  CameraSerial.setTimeout(100);
   while (1) {
     clearRxBuf();
     sendCmd(cmd, 6);
@@ -116,21 +115,21 @@ void Capture() {
   }
   cmd[1] = 0x04 | cameraAddr;
   cmd[2] = 0x1;
+  CameraSerial.setTimeout(1000);
   while (1) {
     clearRxBuf();
     sendCmd(cmd, 6);
     if (CameraSerial.readBytes((char *)resp, 6) != 6) continue;
     if (resp[0] == 0xaa && resp[1] == (0x0e | cameraAddr) && resp[2] == 0x04 &&
         resp[4] == 0 && resp[5] == 0) {
-      CameraSerial.setTimeout(1000);
       if (CameraSerial.readBytes((char *)resp, 6) != 6) {
         continue;
       }
       if (resp[0] == 0xaa && resp[1] == (0x0a | cameraAddr) &&
           resp[2] == 0x01) {
         picTotalLen = (resp[3]) | (resp[4] << 8) | (resp[5] << 16);
-        Serial.print(F("picTotalLen:"));
-        Serial.println(picTotalLen);
+        //Serial.print(F("picTotalLen:"));
+        //Serial.println(picTotalLen);
         break;
       }
     }
@@ -160,10 +159,9 @@ void GetData(String picName) {
   test.close();*/
   myFile = SD.open(picName, FILE_WRITE);
   if (!myFile) {
-    Serial.println(F("myFile open failed"));
+    //Serial.println(F("myFile open failed"));
   } else {
-    Serial.println(F("myFile open success"));
-    CameraSerial.setTimeout(1000);
+    //Serial.println(F("myFile open success"));
     for (unsigned int i = 0; i < pktCnt; i++) {
       cmd[4] = i & 0xff;
       cmd[5] = (i >> 8) & 0xff;

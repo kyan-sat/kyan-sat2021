@@ -41,8 +41,8 @@ void MOTOR_STOP(){MOTOR_R_STOP();MOTOR_L_STOP();}
 File logFile;
 char logFileName[13];
 
-template <typename T> void SLOGLN(T X) {Serial.println(X);logFile.println(X);logFile.flush();}
-template <typename T> void SLOG(T X) {Serial.print(X);logFile.print(X);}
+template <typename T> void SLOGLN(T X) {logFile.println(X);logFile.flush();}
+template <typename T> void SLOG(T X) {logFile.print(X);}
 #define SLOGFLN(X) SLOGLN(F(X))
 #define SLOGF(X) SLOG(F(X))
 
@@ -62,10 +62,10 @@ void takePicture(String s){
   GetData(s);
   logFile = SD.open(logFileName, FILE_WRITE);
   if (logFile) {
-    SLOGFLN("opened log");
+    SLOGFLN("O open log");
   }
   else {
-    SLOGFLN("can't open log");
+    SLOGFLN("X open log");
   }
 }
 
@@ -145,25 +145,25 @@ void setup() {
   pinMode(MOTOR_LIN2, OUTPUT);
 
   // SD init
-  Serial.println(F("SD init..."));
+  //ln(F("SD init..."));
   if (!SD.begin(10)) {
-    Serial.println(F("failed"));
+    //Serial.println(F("failed"));
   }
-  Serial.println(F("done"));
+  //Serial.println(F("done"));
 
   // ultrasonic init
   pinMode(ULTRASONIC_ECHO_PIN, INPUT);
   pinMode(ULTRASONIC_TRIG_PIN, OUTPUT);
 
   // NINE init
-  Serial.println(F("NINE init"));
+  //Serial.println(F("NINE init"));
   NINE_Init();
 
   // CdS init
   pinMode(CDS_PIN, OUTPUT);
   
   // Camera init
-  Serial.println(F("CAMERA init"));
+  //Serial.println(F("CAMERA init"));
   /*if(XBeeSerial.isListening()){
     Serial.println(F("xb is listening"));
   }else{
@@ -171,49 +171,7 @@ void setup() {
   }*/
   CAMERA_Init();
 
-  // collect and save NINE_Mag data
-  if(NINE_DEBUG_FLAG){
-    Serial.println(F("collect mag"));
-    String nineFileName = F("nine.txt");
-    if(SD.exists(nineFileName)){
-      SD.remove(nineFileName);
-      Serial.print(F("removed "));
-      Serial.println(nineFileName);
-    }
-    File nineFile = SD.open(nineFileName, FILE_WRITE);
-    if (nineFile) {
-      nineFile.print("nine_mag = [");
-      MOTOR_TURN_L();
-      //delay(3000UL);
-      int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
-
-      long xMagSum = 0, yMagSum = 0;
-      for(int i = 0;i < forReps;i++){
-        NINE_Mag();
-        nineFile.print("[");
-        nineFile.print(NINE_xMag());
-        nineFile.print(", ");
-        nineFile.print(NINE_yMag());
-        nineFile.print(", ");
-        nineFile.print(NINE_zMag());
-        nineFile.println("],");
-        xMagSum += NINE_xMag();
-        yMagSum += NINE_yMag();
-        delay(100);
-      }
-      MOTOR_STOP();
-      nineFile.println("]");
-      nineFile.close();
-      Serial.println("mag success");
-      xMagOffset = xMagSum / forReps;
-      yMagOffset = yMagSum / forReps;
-    }
-    else {
-      Serial.print("can't open");
-      Serial.println(nineFileName);
-    }
-  }
-  Serial.println(F("log name"));
+  //Serial.println(F("log name"));
   updated = 0;
   while(updated < LOGFILE_REQREPS){
     while (Serial.available() > 0) {
@@ -226,13 +184,13 @@ void setup() {
         hour = gps.time.hour();
         minute = gps.time.minute();
         if(updated == LOGFILE_REQREPS){
-          Serial.println(month);
-          Serial.println(day);
-          Serial.println(hour);
-          Serial.println(minute);
+          //Serial.println(month);
+          //Serial.println(day);
+          //Serial.println(hour);
+          //Serial.println(minute);
           sprintf(logFileName, "%02d%02d%02d%02d.txt", month, day, hour, minute);
-          Serial.println(logFileName);
-          Serial.println(updated);
+          //Serial.println(logFileName);
+          //Serial.println(updated);
           break;
         }
       }
@@ -241,14 +199,14 @@ void setup() {
 
   if(SD.exists(logFileName)){
     SD.remove(logFileName);
-    Serial.println(F("removed log"));
+    //Serial.println(F("removed log"));
   }
   logFile = SD.open(logFileName, FILE_WRITE);
   if (logFile) {
-    Serial.println(F("opened log"));
+    //Serial.println(F("opened log"));
   }
   else {
-    Serial.println(F("can't open log"));
+    //Serial.println(F("can't open log"));
   }
 }
 
@@ -288,12 +246,12 @@ void loop() {
           acclStreak = 0;
         }
         if(cdsStreak >= CDS_RELEASE_REQREPS){
-          SLOGFLN("RELEASED cds ok");
+          SLOGFLN("REL cds ok");
           phase = 2;
           break;
         }
         if(acclStreak >= ACCL_RELEASE_REQREPS){
-          SLOGFLN("RELEASED accl ok");
+          SLOGFLN("REL accl ok");
           phase = 2;
           break;
         }
@@ -308,7 +266,7 @@ void loop() {
       char acclStreak = 0;
       while(1){
         if(millis() - startTime >= PHASE2_WAITING_SECONDS * 1000UL){
-          SLOGFLN("LANDED time exceeded");
+          SLOGFLN("LAND T exceeded");
           phase = 3;
           break;
         }
@@ -323,7 +281,7 @@ void loop() {
         }
         absoluteAcclPrev = absoluteAccl;
         if(acclStreak >= ACCL_LANDING_REQREPS){
-          SLOGFLN("LANDED accl ok");
+          SLOGFLN("LAND accl ok");
           phase = 3;
           break;
         }
@@ -346,13 +304,13 @@ void loop() {
     case 4: {
       SLOGFLN("PHASE 4");
       takePicture(F("p4.jpg"));
-      SLOGFLN("escape");
+      SLOGFLN("esc");
       MOTOR_FORWARD();
       delay(FORWARD_SECONDS_AFTER_LANDING * 1000UL);
       MOTOR_STOP();
       delay(1000);
       
-      SLOGFLN("magCol");
+      SLOGFLN("magOff");
       MOTOR_TURN_L();
       delay(100);
       int forReps = MAGCOLLECT_ROTATE_RAD / RAD_PER_S_L * 1000 / 100;
@@ -362,9 +320,9 @@ void loop() {
         NINE_Mag();
         SLOGF("[");
         SLOG(NINE_xMag());
-        SLOGF(", ");
+        SLOGF(",");
         SLOG(NINE_yMag());
-        SLOGF(", ");
+        SLOGF(",");
         SLOG(NINE_zMag());
         SLOGFLN("],");
         xMagSum += NINE_xMag();
@@ -405,11 +363,11 @@ void loop() {
               minute = gps.time.minute();
               second = gps.time.second();*/
               SLOGLN(updated);
-              Serial.print(lat, 8);logFile.print(lat, 8);
-              SLOGF(", ");Serial.println(lng, 8);logFile.println(lng, 8);
+              /*Serial.print(lat, 8);*/logFile.print(lat, 8);
+              SLOGF(",");/*Serial.println(lng, 8);*/logFile.println(lng, 8);
               if(updated == GPS_DISCARD_REPS){
-                Serial.print(lat, 8);logFile.print(lat, 8);
-                SLOGF(", ");Serial.println(lng, 8);logFile.println(lng, 8);/*
+                /*Serial.print(lat, 8);*/logFile.print(lat, 8);
+                SLOGF(",");/*Serial.println(lng, 8);*/logFile.println(lng, 8);/*
                 SLOGF("ALT=");SLOGLN(alt);
                 SLOGF("Y=");SLOGLN(year);
                 SLOGF("M=");SLOGLN(month);
@@ -427,11 +385,10 @@ void loop() {
         float distance = sqrt(latDiff * latDiff + lngDiff * lngDiff);
         SLOGF("dist ");SLOGLN(distance);
         float targetRad = fmod(atan2(latDiff, lngDiff) + 2.0*PI, 2.0*PI);
-        SLOGF("T-deg ");SLOGLN(targetRad * 180.0 / PI);
+        SLOGF("T ");SLOGLN(targetRad * 180.0 / PI);
         
         if(distance <= GOAL_DISTANCE){
-          takePicture(F("g.jpg"));
-          SLOGFLN("REACHED GOAL");
+          SLOGFLN("GOAL");
           phase = 10;
           break;
         }
@@ -446,7 +403,7 @@ void loop() {
           forwardMS = STUCK_ESCAPE_FORWARD_MS;
           NINE_Accl();
           if(NINE_zAccl() <= POSTURE_ZACCL_UPPER_LIMIT){
-            SLOGFLN("bad posture");
+            SLOGFLN("unbalance");
           }
 
           float duration;
@@ -463,9 +420,8 @@ void loop() {
           if(duration > 0){
             duration /= 2;
             double distance = duration * 340 * 100 / 1000000;
-            SLOGF("dis:");
+            SLOGF("dis ");
             SLOG(distance);
-            SLOGFLN(" cm");
             if(distance <= OBSTACLE_CM_LIMIT){
               SLOGFLN("obstcl");
             }
@@ -494,17 +450,17 @@ void loop() {
         
         float cansatRad, leftRad, rightRad;
         for(int i = 0;i < ROTATE_REPS;i++){
-          SLOGF("rotate rep ");
+          SLOGF("rotrep ");
           SLOGLN(i);
-          SLOGFLN("get mag");
+          SLOGFLN("mag");
           NINE_Mag();
           cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag() - yMagOffset, NINE_xMag() - xMagOffset) + 2.0*PI, 2.0*PI);
-          SLOGF("C-deg ");SLOGLN(cansatRad * 180.0 / PI);
+          SLOGF("C ");SLOGLN(cansatRad * 180.0 / PI);
 
           leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
           rightRad = 2.0*PI-leftRad;
-          SLOGF("Ldeg ");SLOGLN(leftRad * 180.0 / PI);
-          SLOGF("Rdeg ");SLOGLN(rightRad * 180.0 / PI);
+          SLOGF("L ");SLOGLN(leftRad * 180.0 / PI);
+          SLOGF("R ");SLOGLN(rightRad * 180.0 / PI);
           
           if(leftRad < rightRad){
             SLOGF("turn L ");
@@ -522,20 +478,21 @@ void loop() {
         }
         NINE_Mag();
         cansatRad = fmod(3.0 * PI / 2.0 + MAG_NORTH - atan2(NINE_yMag() - yMagOffset, NINE_xMag() - xMagOffset) + 2.0*PI, 2.0*PI);
-        SLOGF("final C-deg ");SLOGLN(cansatRad * 180.0 / PI);
+        SLOGF("fin C ");SLOGLN(cansatRad * 180.0 / PI);
 
         leftRad = fmod(targetRad - cansatRad + 2.0*PI, 2.0*PI);
         rightRad = 2.0*PI-leftRad;
-        SLOGF("Ldeg ");SLOGLN(leftRad * 180.0 / PI);
-        SLOGF("Rdeg ");SLOGLN(rightRad * 180.0 / PI);
+        SLOGF("L ");SLOGLN(leftRad * 180.0 / PI);
+        SLOGF("R ");SLOGLN(rightRad * 180.0 / PI);
 
+        SLOGF("dirchange ");
         if(leftRad > ROTATE_RAD_THRESHOLD && rightRad > ROTATE_RAD_THRESHOLD){
-          SLOGFLN("dir change failed");
+          SLOGFLN("fail");
         }else{
-          SLOGFLN("dir change success");
+          SLOGFLN("success");
         }
 
-        SLOGF("move forward ");
+        SLOGF("forward ");
         MOTOR_FORWARD();
         if(FIX_FORWARD_FLAG){
           SLOGLN(10000);
@@ -544,7 +501,7 @@ void loop() {
           forwardMS = 1000UL * distance * GOAL_FORWARD_RATIO / M_PER_S;
           SLOGLN(forwardMS);
           if(forwardMS >= FORWARD_UPPER_LIMIT_SECOND * 1000UL){
-            SLOGFLN("forward ul exceed");
+            SLOGFLN("ul exceed");
             forwardMS = FORWARD_UPPER_LIMIT_SECOND * 1000UL;
           }
         }
