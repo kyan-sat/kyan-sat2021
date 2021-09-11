@@ -55,6 +55,7 @@ template <typename T> void SLOG(T X) {Serial.print(X);logFile.print(X);}
 
 #include "camera.h"
 void takePicture(String s){
+  SLOGLN(s);
   logFile.close();
   preCapture();
   Capture();
@@ -68,11 +69,11 @@ void takePicture(String s){
   }
 }
 
-unsigned char phase = 3;
+unsigned char phase = 0;
 
 // constants
-#define TARGET_LAT 35.71532716056129
-#define TARGET_LNG 139.76193384706642
+#define TARGET_LAT 43.580706 // north
+#define TARGET_LNG 142.000888
 #define M_PER_LAT 111092.7384 // https://www.wingfield.gr.jp/archives/9721 lat43
 #define M_PER_LNG 81540.4864
 #define MAG_NORTH (PI * 10.0 / 180.0)
@@ -91,15 +92,16 @@ long xMagOffset, yMagOffset;
 
 #define PHASE0_WAITING_SECONDS 600
 
-#define CDS_RELEASE_HLIM 600
+#define CDS_RELEASE_HLIM 500
 #define CDS_RELEASE_REQREPS 10
 #define ACCL_RELEASE_LLIM 0.00001
-#define ACCL_RELEASE_HLIM 5.0
-#define ACCL_RELEASE_REQREPS 10
+#define ACCL_RELEASE_HLIM 3.0
+#define ACCL_RELEASE_REQREPS 15
 
-#define PHASE2_WAITING_SECONDS 60
-#define ACCL_DIFF_HLIM 0.2
-#define ACCL_LANDING_REQREPS 10
+#define PHASE2_WAITING_SECONDS 90
+#define PHASE2_WAITING_SECONDS_LLIM 40
+#define ACCL_DIFF_HLIM 0.03
+#define ACCL_LANDING_REQREPS 20
 
 #define HEATING_SECONDS 1.5
 
@@ -114,7 +116,7 @@ long xMagOffset, yMagOffset;
 #define POSTURE_ZACCL_UPPER_LIMIT 6.0
 #define OBSTACLE_CM_LIMIT 30
 #define GOAL_FORWARD_RATIO 0.8
-#define FORWARD_UPPER_LIMIT_SECOND 30
+#define FORWARD_UPPER_LIMIT_SECOND 60
 #define FIX_FORWARD_FLAG 0
 
 void setup() {
@@ -295,7 +297,7 @@ void loop() {
           phase = 2;
           break;
         }
-        delay(50);
+        delay(200);
       }
       break;
     }
@@ -314,7 +316,7 @@ void loop() {
         absoluteAccl = sqrt(NINE_xAccl()*NINE_xAccl()+NINE_yAccl()*NINE_yAccl()+NINE_zAccl()*NINE_zAccl());
         SLOGF("accl ");
         SLOGLN(absoluteAccl);
-        if(abs(absoluteAccl - absoluteAcclPrev) <= ACCL_DIFF_HLIM){
+        if(millis() - startTime >= PHASE2_WAITING_SECONDS_LLIM * 1000UL && abs(absoluteAccl - absoluteAcclPrev) <= ACCL_DIFF_HLIM){
           acclStreak++;
         }else{
           acclStreak = 0;
@@ -325,7 +327,7 @@ void loop() {
           phase = 3;
           break;
         }
-        delay(50);
+        delay(200);
       }
       break;
     }
